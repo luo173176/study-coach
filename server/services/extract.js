@@ -1,5 +1,6 @@
 'use strict';
 // 文本提取：PDF / TXT / Markdown，保留页码或章节信息
+// PDF 中没有文字层的页面（扫描/图片页）会被标记到 needsOcr，由上层决定是否走 OCR
 const fs = require('fs');
 const config = require('../config');
 
@@ -34,10 +35,10 @@ async function extractPdf(filePath) {
 function extractMarkdown(text) {
   const sections = text.split(/(?=^#{1,6}\s)/m).filter((s) => s.trim());
   if (sections.length === 0) sections.push(text);
-  return sections.map((s, i) => {
+  return sections.map((s) => {
     const m = s.match(/^#{1,6}\s+(.+)/);
     const title = m ? m[1].trim().slice(0, 60) : null;
-    return { page: null, section: title || (i > 0 ? null : null), text: normalizeText(s) };
+    return { page: null, section: title, text: normalizeText(s) };
   });
 }
 
@@ -45,7 +46,11 @@ function extractPlainText(text) {
   return [{ page: null, section: null, text: normalizeText(text) }];
 }
 
-// 返回 { pages, page_count, char_count, truncated } 或 throw Error(中文原因)
+// 页面文字少于该阈值视为"无文字层"（扫描/图片页）
+const EMPTY_PAGE_CHARS = 10;
+
+// 返回 { pages, page_count, char_count, truncated, needsOcr }
+// needsOcr: 没有文字层、需要 OCR 的页码下标数组（0 起）
 async function extractMaterial(filePath, ext) {
   let pages;
   if (ext === '.pdf') {
@@ -56,9 +61,9 @@ async function extractMaterial(filePath, ext) {
   }
   pages = pages.filter((p) => p && typeof p.text === 'string');
 
-  if (ext === '.pdf' && pages.length > 0 && pages.every((p) => p.text.length === 0)) {
-    throw new Error('该 PDF 中没有提取到任何文本，很可能是扫描版/图片型 PDF。当前版本不支持 OCR，请换用文字版资料。');
-  }
+  const needsOcr = ext === '.pdf'
+    ? pages.map((p, i) => (p.text.length < EMPTY_PAGE_CHARS ? i : -1)).filter((i) => i >= 0)
+    : [];
 
   // 超长资料截断保护
   let truncated = false;
@@ -72,10 +77,11 @@ async function extractMaterial(filePath, ext) {
     if (truncated) break;
   }
   if (truncated) pages = pages.filter((p) => p.text.length > 0);
-  if (total === 0) {
+
+  if (ext !== '.pdf' && total === 0) {
     throw new Error('文件内容为空，无法导入。');
   }
-  return { pages, page_count: ext === '.pdf' ? pages.length : null, char_count: total, truncated };
+  return { pages, page_count: ext === '.pdf' ? pages.length : null, char_count: total, truncated, needsOcr };
 }
 
 module.exports = { extractMaterial, decodeText, normalizeText };

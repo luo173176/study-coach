@@ -1,7 +1,9 @@
 'use strict';
 // 1) 文件上传与非法文件拒绝；2) PDF 提取与页码保留
+// 本文件关闭 OCR：验证"扫描版报错"的旧约定；OCR 行为见 ocr.test.js
 const { test } = require('node:test');
 process.env.UPLOAD_MAX_MB = '1'; // 本文件统一用 1MB 上限，验证超大文件拒绝
+process.env.OCR_ENABLED = '0';
 const { startApp, uploadFile, makePdf, assert } = require('./helpers');
 
 test('上传 TXT：成功解析并生成检索片段', async (t) => {

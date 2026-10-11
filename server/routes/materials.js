@@ -9,6 +9,8 @@ const { getDb } = require('../db');
 const { id, nowIso, truncate } = require('../util');
 const { chunkPages } = require('../services/chunk');
 const { extractMaterial } = require('../services/extract');
+const { saveChunksAndFinalize, markFailed } = require('../services/materialStore');
+const { processOcrMaterial } = require('../services/ocr');
 
 const router = express.Router();
 
@@ -41,6 +43,7 @@ function materialRow(m, { withPages = false } = {}) {
     size: m.size,
     status: m.status,
     error: m.error,
+    note: m.note,
     page_count: m.page_count,
     char_count: m.char_count,
     uploaded_at: m.uploaded_at,
@@ -79,27 +82,31 @@ router.post('/', upload.single('file'), async (req, res, next) => {
 
     try {
       const result = await extractMaterial(storedPath, ext);
+      const needsOcr = result.needsOcr || [];
+
+      // 扫描版/混合型 PDF：没有文字层的页面交给后台 OCR，上传立即返回
+      if (needsOcr.length > 0) {
+        if (!config.ocr.enabled) {
+          const msg = '该 PDF 含有没有文字层的页面（扫描版/图片型），而 OCR 未启用（在 .env 设置 OCR_ENABLED=1 可开启）。';
+          db.prepare('UPDATE materials SET status=?, error=?, updated_at=? WHERE id=?')
+            .run('failed', msg, nowIso(), mid);
+          const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(mid);
+          return res.status(201).json({ material: materialRow(m) });
+        }
+        db.prepare('UPDATE materials SET status=?, note=?, updated_at=? WHERE id=?')
+          .run('processing', '已上传，正在排队进行 OCR 识别…', nowIso(), mid);
+        processOcrMaterial(mid); // 后台执行
+        const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(mid);
+        return res.status(201).json({ material: materialRow(m), ocr: true, ocr_pages: needsOcr.length });
+      }
+
       const chunks = chunkPages(result.pages);
       if (!chunks.length) throw new Error('未能从文件中切分出有效文本内容。');
-
-      const insertChunk = db.prepare(
-        'INSERT INTO chunks (id, material_id, idx, page, section, text, created_at) VALUES (?,?,?,?,?,?,?)'
-      );
-      db.exec('BEGIN');
-      try {
-        for (const c of chunks) insertChunk.run(id(), mid, c.idx, c.page, c.section, c.text, now);
-        db.prepare('UPDATE materials SET status=?, error=NULL, page_count=?, char_count=?, pages_json=?, updated_at=? WHERE id=?')
-          .run('ready', result.page_count, result.char_count, JSON.stringify(result.pages), nowIso(), mid);
-        db.exec('COMMIT');
-      } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
-      }
+      saveChunksAndFinalize(mid, result.pages, chunks, { note: null });
       const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(mid);
       return res.status(201).json({ material: materialRow(m), chunk_count: chunks.length, truncated: !!result.truncated });
     } catch (extractErr) {
-      db.prepare('UPDATE materials SET status=?, error=?, updated_at=? WHERE id=?')
-        .run('failed', truncate(extractErr.message, 300), nowIso(), mid);
+      markFailed(mid, extractErr.message);
       const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(mid);
       return res.status(201).json({ material: materialRow(m) });
     }

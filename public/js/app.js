@@ -25,7 +25,8 @@ let appSettings = null;
 
 function currentRoute() {
   const h = location.hash.replace(/^#\/?/, '');
-  return ROUTES.find((r) => r.path === h) || ROUTES[0];
+  const pathOnly = h.split('?')[0]; // 支持 #/notes?material=xxx 这类参数
+  return ROUTES.find((r) => r.path === pathOnly) || ROUTES[0];
 }
 
 function renderNav() {

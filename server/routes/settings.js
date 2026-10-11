@@ -35,6 +35,11 @@ router.get('/', (req, res) => {
     ai: aiConfigView(),
     upload_max_mb: config.upload.maxMb,
     rag_top_k: config.rag.topK,
+    ocr: {
+      enabled: config.ocr.enabled,
+      lang: config.ocr.lang,
+      max_pages: config.ocr.maxPages,
+    },
     password_enabled: !!config.appPassword,
     data_dir: config.dataDir,
     intervals_days: getIntervalTable(),

@@ -2,12 +2,25 @@
 import { api } from '../api.js';
 import { el, esc, toast, emptyState, loadingEl, fmtTime, fmtSize, statusBadge, openModal, closeModal } from '../ui.js';
 
+// 处理中（OCR）轮询：有资料在处理时每 3 秒刷新一次列表
+let pollTimer = null;
+
 export async function render(root) {
   root.innerHTML = '';
   root.append(uploadCard());
   const listCard = el('div', { class: 'card' }, [el('h3', {}, '已导入的资料')]);
   root.append(listCard);
   await loadList(listCard);
+}
+
+function schedulePoll(materials) {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  if (!materials.some((m) => m.status === 'processing')) return;
+  pollTimer = setTimeout(() => {
+    pollTimer = null;
+    const path = location.hash.replace(/^#\/?/, '').split('?')[0];
+    if (path === 'materials' || path === '') rerenderList();
+  }, 3000);
 }
 
 function uploadCard() {
@@ -38,6 +51,8 @@ function uploadCard() {
       const m = r.material;
       if (m.status === 'ready') {
         toast(`「${m.filename}」导入成功：${r.chunk_count} 个文本片段${r.truncated ? '（资料过长，已截断）' : ''}`, 'ok');
+      } else if (m.status === 'processing') {
+        toast(`「${m.filename}」已上传，正在后台 OCR 识别（约 ${r.ocr_pages} 页，可能需要几分钟），列表会自动刷新`, 'ok');
       } else {
         toast(`「${m.filename}」导入失败：${m.error}`, 'err');
       }
@@ -68,6 +83,10 @@ async function loadList(card) {
       card.append(emptyState('📭', '还没有资料。上传你的第一份学习资料（PDF/TXT/Markdown）开始使用。'));
       return;
     }
+    schedulePoll(materials);
+    if (materials.some((m) => m.status === 'processing')) {
+      card.append(el('p', { class: 'muted' }, '⏳ 有资料正在 OCR 识别中，列表会自动刷新（扫描件识别可能需要几分钟）…'));
+    }
     const table = el('table', { class: 'table' }, [
       el('thead', {}, el('tr', {}, [
         el('th', {}, '文件名'), el('th', {}, '状态'), el('th', {}, '大小'), el('th', {}, '页数'),
@@ -76,15 +95,23 @@ async function loadList(card) {
     ]);
     const tbody = el('tbody');
     for (const m of materials) {
+      const statusCell = el('td', {}, [
+        el('span', { html: statusBadge(m.status) }),
+        m.note ? el('div', { class: 'muted', style: 'font-size:12px;max-width:180px;white-space:normal' }, m.note) : '',
+      ]);
       const tr = el('tr', {}, [
         el('td', { style: 'max-width:220px;word-break:break-all' }, m.filename),
-        el('td', {}, [el('span', { html: statusBadge(m.status) })]),
+        statusCell,
         el('td', {}, fmtSize(m.size)),
         el('td', {}, m.page_count ?? '—'),
         el('td', {}, m.char_count?.toLocaleString() ?? '—'),
         el('td', {}, fmtTime(m.uploaded_at)),
         el('td', { style: 'white-space:nowrap' }, [
           el('button', { class: 'btn btn-sm', onclick: () => viewMaterial(m.id) }, '查看'),
+          ' ',
+          m.status === 'ready'
+            ? el('a', { class: 'btn btn-sm', href: '#/notes?material=' + m.id, title: '让 AI 整理这份资料的知识点' }, '整理知识点')
+            : '',
           ' ',
           el('button', {
             class: 'btn btn-sm btn-danger',
@@ -127,15 +154,15 @@ async function viewMaterial(id) {
     if (m.error) body.append(el('div', { class: 'insufficient-banner' }, '处理失败：' + esc(m.error)));
     if (m.status === 'ready' && m.pages && m.pages.length) {
       const selector = el('select');
-      m.pages.forEach((p, i) => {
-        const label = (p.page ? `第 ${p.page} 页` : `片段 ${i + 1}`) + (p.section ? `（${p.section}）` : '');
-        selector.append(el('option', { value: String(i) }, label));
-      });
       const textDiv = el('div', { class: 'snippet', style: 'max-height:50vh;overflow:auto' });
       const show = (i) => {
         const p = m.pages[i];
         textDiv.textContent = p.text || '（此页没有可提取的文字，可能是扫描图片页）';
       };
+      m.pages.forEach((p, i) => {
+        const label = (p.page ? `第 ${p.page} 页` : `片段 ${i + 1}`) + (p.section ? `（${p.section}）` : '') + (p.ocr ? '（OCR 识别）' : '');
+        selector.append(el('option', { value: String(i) }, label));
+      });
       selector.addEventListener('change', () => show(parseInt(selector.value, 10)));
       show(0);
       body.append(el('label', { class: 'field' }, '选择页/章节'), selector, textDiv);

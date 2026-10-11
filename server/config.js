@@ -25,7 +25,9 @@ loadDotEnv(path.join(__dirname, '..', '.env'));
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 const uploadsDir = path.join(dataDir, 'uploads');
+const ocrCacheDir = path.join(dataDir, 'ocr-cache');
 fs.mkdirSync(uploadsDir, { recursive: true });
+fs.mkdirSync(ocrCacheDir, { recursive: true });
 
 module.exports = {
   version: '0.1.0',
@@ -53,5 +55,14 @@ module.exports = {
     chunkOverlap: 100,
     maxCharsPerMaterial: 2000000,
     maxContextChunks: 24,
+  },
+  // 扫描版 PDF 的 OCR 识别（tesseract.js，语言包首次联网下载后缓存到 ocrCacheDir）
+  ocr: {
+    enabled: process.env.OCR_ENABLED !== '0',
+    lang: process.env.OCR_LANG || 'chi_sim+eng',
+    maxPages: clampInt(process.env.OCR_MAX_PAGES, 1, 50, 10),
+    scale: Math.min(4, Math.max(1, parseFloat(process.env.OCR_SCALE) || 2)),
+    langPath: process.env.OCR_LANG_PATH || '',
+    cachePath: ocrCacheDir,
   },
 };

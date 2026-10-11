@@ -117,6 +117,61 @@ async function uploadSampleMaterial(base, filename = '生物笔记.txt', text = 
   return body.material;
 }
 
+// 生成"图片型 PDF"（扫描版模拟）：把文字画到画布上，再以图片 XObject 塞进 PDF（没有文字层）
+// 注意：含二进制流，必须用 Buffer.concat 拼接（join 会按 UTF-8 损坏二进制数据）
+async function makeImagePdf(lines) {
+  const zlib = require('zlib');
+  const { createCanvas } = require('@napi-rs/canvas');
+  const W = 620;
+  const H = Math.max(400, 120 + lines.length * 70);
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+  // 明确指定中文字体：默认 sans-serif 在 @napi-rs/canvas 中不解析中文（会渲染成豆腐块）
+  ctx.font = '36px "Microsoft YaHei", "SimHei", sans-serif';
+  lines.forEach((t, i) => ctx.fillText(t, 40, 90 + i * 70));
+  const data = ctx.getImageData(0, 0, W, H).data;
+  const rgb = Buffer.alloc(W * H * 3);
+  for (let i = 0; i < W * H; i++) {
+    rgb[i * 3] = data[i * 4];
+    rgb[i * 3 + 1] = data[i * 4 + 1];
+    rgb[i * 3 + 2] = data[i * 4 + 2];
+  }
+  const img = zlib.deflateSync(rgb);
+  const content = `q ${W} 0 0 ${H} 0 0 cm /Im1 Do Q`;
+
+  const parts = [];
+  const lenRef = { n: 0 };
+  const write = (x) => {
+    const b = Buffer.isBuffer(x) ? x : Buffer.from(x, 'latin1');
+    parts.push(b);
+    lenRef.n += b.length;
+  };
+  const mark = () => lenRef.n;
+
+  write('%PDF-1.4\n');
+  const offsets = [];
+  const pushObj = (i, str) => {
+    offsets[i] = mark();
+    write(`${i} 0 obj\n${str}\nendobj\n`);
+  };
+  pushObj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  pushObj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  pushObj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>`);
+  pushObj(4, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+  offsets[5] = mark();
+  write(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${W} /Height ${H} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${img.length} >>\nstream\n`);
+  write(img);
+  write('\nendstream\nendobj\n');
+  const xrefStart = mark();
+  write('xref\n0 6\n0000000000 65535 f \n');
+  for (let i = 1; i <= 5; i++) write(String(offsets[i]).padStart(10, '0') + ' 00000 n \n');
+  write(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`);
+  return Buffer.concat(parts);
+}
+
 const assert = require('node:assert');
 
-module.exports = { DATA_DIR, startApp, uploadFile, makePdf, startMockAi, setMockAi, SAMPLE_TEXT, uploadSampleMaterial, assert };
+module.exports = { DATA_DIR, startApp, uploadFile, makePdf, makeImagePdf, startMockAi, setMockAi, SAMPLE_TEXT, uploadSampleMaterial, assert };

@@ -2,14 +2,19 @@
 // 启动入口：node server/index.js
 const { createApp } = require('./app');
 const config = require('./config');
+const { resumePendingOcr } = require('./services/ocr');
 
 const app = createApp();
 const server = app.listen(config.port, () => {
+  const pending = resumePendingOcr();
   console.log('');
   console.log('✅ 知学管家 AI Study Coach 已启动');
   console.log(`   本地访问: http://localhost:${config.port}`);
   console.log(`   数据目录: ${config.dataDir}`);
   console.log(`   模型服务: ${config.ai.baseUrl}（模型 ${config.ai.model}）`);
+  if (pending > 0) {
+    console.log(`   🔄 已恢复 ${pending} 个中断的 OCR 识别任务，完成后资料自动可用。`);
+  }
   if (!config.ai.apiKey) {
     console.log('   ⚠️  尚未配置 AI_API_KEY：资料导入可以正常使用，但问答/整理/出题需要先在 .env 中配置。');
   }

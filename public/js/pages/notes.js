@@ -34,6 +34,12 @@ export async function render(root) {
   root.append(listCard);
 
   await Promise.all([loadMaterials(select), loadList(listCard)]);
+
+  // 支持从资料库一键跳转：#/notes?material=<id>
+  const preselect = new URLSearchParams(location.hash.split('?')[1] || '').get('material');
+  if (preselect && [...select.options].some((o) => o.value === preselect)) {
+    select.value = preselect;
+  }
 }
 
 async function loadMaterials(select) {

@@ -98,6 +98,12 @@ export async function render(root, settings) {
     }
   });
   aiCard.append(el('div', { style: 'margin-top:8px' }, testBtn), testResult);
+  if (settings.ocr) {
+    aiCard.append(el('p', { class: 'muted', style: 'margin-top:10px' },
+      settings.ocr.enabled
+        ? `📄 扫描版 PDF 会自动 OCR 识别（语言 ${settings.ocr.lang}，每个文件最多识别 ${settings.ocr.max_pages} 页）。首次识别需联网下载语言包，之后离线可用。`
+        : '📄 OCR 未启用：扫描版 PDF 无法导入。可在 .env 中设置 OCR_ENABLED=1 开启。'));
+  }
   root.append(aiCard);
 
   // ---- 用量统计 ----

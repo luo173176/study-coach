@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS materials (
   size INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'processing',
   error TEXT,
+  note TEXT,
   page_count INTEGER,
   char_count INTEGER,
   stored_path TEXT,
@@ -132,8 +133,17 @@ function getDb() {
     db = new DatabaseSync(config.dbPath);
     db.exec('PRAGMA journal_mode = WAL;');
     db.exec(SCHEMA);
+    migrate();
   }
   return db;
+}
+
+// 轻量迁移：为旧数据库补充新增列
+function migrate() {
+  const cols = db.prepare('PRAGMA table_info(materials)').all().map((c) => c.name);
+  if (!cols.includes('note')) {
+    db.exec('ALTER TABLE materials ADD COLUMN note TEXT');
+  }
 }
 
 function resetAllTables() {
