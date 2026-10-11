@@ -1,0 +1,58 @@
+[
+  {
+    "id": "qa-01",
+    "type": "qa",
+    "question": "光合作用的场所是什么？",
+    "must_include": ["叶绿体"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-02",
+    "type": "qa",
+    "question": "光合作用的原料和产物分别有哪些？",
+    "must_include": ["二氧化碳", "水", "有机物", "氧气"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-03",
+    "type": "qa",
+    "question": "呼吸作用释放的能量去了哪里？",
+    "must_include": ["热能", "ATP"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-04",
+    "type": "qa",
+    "question": "光合作用和呼吸作用有什么区别和联系？",
+    "must_include": ["储存能量", "释放能量", "碳氧平衡"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-05",
+    "type": "qa",
+    "question": "影响光合作用强度的主要因素有哪些？",
+    "must_include": ["光照", "二氧化碳", "温度"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-06",
+    "type": "qa",
+    "question": "植物在晚上会进行光合作用吗？",
+    "must_include": ["呼吸"],
+    "insufficient_expected": false
+  },
+  {
+    "id": "qa-07",
+    "type": "qa",
+    "question": "量子力学中的波粒二象性是什么意思？",
+    "must_include": [],
+    "insufficient_expected": true
+  },
+  {
+    "id": "qa-08",
+    "type": "qa",
+    "question": "资料中提到的光合作用实验是怎么设计的？",
+    "must_include": [],
+    "insufficient_expected": true
+  }
+]

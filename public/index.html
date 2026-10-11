@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>知学管家 · AI Study Coach</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="logo"><span class="logo-icon">📚</span><div><div class="logo-title">知学管家</div><div class="logo-sub">AI Study Coach</div></div></div>
+      <nav id="nav"></nav>
+      <div id="nav-footer" class="nav-footer"></div>
+    </aside>
+    <main id="main">
+      <header id="pagebar">
+        <button id="nav-toggle" class="icon-btn" aria-label="菜单">☰</button>
+        <h1 id="page-title">仪表盘</h1>
+      </header>
+      <div id="page" class="page"></div>
+    </main>
+  </div>
+
+  <div id="login-mask" class="login-mask hidden">
+    <div class="login-card">
+      <div class="logo" style="justify-content:center;margin-bottom:16px"><span class="logo-icon">📚</span><div><div class="logo-title">知学管家</div><div class="logo-sub">AI Study Coach</div></div></div>
+      <p class="muted" style="text-align:center">此应用已设置访问密码，请输入密码进入。</p>
+      <form id="login-form">
+        <input type="password" id="login-password" class="input" placeholder="访问密码" autocomplete="current-password" required>
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">进入</button>
+      </form>
+      <p id="login-error" class="error-text hidden"></p>
+    </div>
+  </div>
+
+  <div id="toast-wrap"></div>
+  <dialog id="modal" class="modal"><div id="modal-body"></div></dialog>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

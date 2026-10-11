@@ -1,0 +1,20 @@
+{
+  "name": "study-coach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "知学管家 AI Study Coach —— 个人 AI 学习平台：资料管理、RAG 问答、知识点整理、练习题、错题本与复习计划",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-force-exit",
+    "eval": "node --disable-warning=ExperimentalWarning tests/eval/run-eval.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.1",
+    "unpdf": "^0.12.1"
+  }
+}
