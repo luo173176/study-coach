@@ -5,7 +5,8 @@ export function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-export function el(tag, attrs = {}, children = []) {
+// 可变参数写法 el(tag, attrs, child1, child2, ...) 与数组写法 el(tag, attrs, [child1, child2]) 都支持
+export function el(tag, attrs = {}, ...args) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (k === 'class') node.className = v;
@@ -16,7 +17,8 @@ export function el(tag, attrs = {}, children = []) {
     else if (k === 'value') node.value = v;
     else if (v !== null && v !== undefined) node.setAttribute(k, v);
   }
-  for (const c of [].concat(children)) {
+  const children = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+  for (const c of children) {
     if (c === null || c === undefined) continue;
     node.append(c.nodeType ? c : document.createTextNode(String(c)));
   }

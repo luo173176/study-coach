@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const config = require('../config');
 const { getDb } = require('../db');
+const { getEffectiveAiConfig } = require('../services/runtimeConfig');
 
 class AiConfigError extends Error {
   constructor(msg) { super(msg); this.name = 'AiConfigError'; this.code = 'AI_CONFIG'; }
@@ -54,18 +55,18 @@ function cachePut(key, value) {
   } catch { /* 缓存失败不影响主流程 */ }
 }
 
-async function chatOnce(messages, { temperature, maxTokens }) {
+async function chatOnce(messages, { temperature, maxTokens, ai }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
   try {
-    const res = await fetch(config.ai.baseUrl + '/chat/completions', {
+    const res = await fetch(ai.baseUrl + '/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + config.ai.apiKey,
+        'Authorization': 'Bearer ' + ai.apiKey,
       },
       body: JSON.stringify({
-        model: config.ai.model,
+        model: ai.model,
         messages,
         temperature,
         max_tokens: maxTokens,
@@ -111,12 +112,14 @@ async function chat(messages, opts = {}) {
     useCache = true,
   } = opts;
 
-  if (!config.ai.apiKey || !config.ai.baseUrl || !config.ai.model) {
-    throw new AiConfigError('尚未配置 AI 模型服务：请在项目根目录 .env 中填写 AI_API_KEY、AI_BASE_URL、AI_MODEL，然后重启应用（可参考 .env.example）。');
+  const ai = getEffectiveAiConfig();
+  if (!ai.apiKey || !ai.baseUrl || !ai.model) {
+    throw new AiConfigError('尚未配置 AI 模型服务：请到网页「设置」页填写 API Key / 接口地址 / 模型名（保存后立即生效），或在项目根目录 .env 中配置后重启。');
   }
 
+  // 缓存键包含生效的模型与地址：切换模型后不会串用旧结果
   const cacheKey = sha256(JSON.stringify({
-    m: config.ai.model, b: config.ai.baseUrl, t: temperature, x: maxTokens, msgs: messages,
+    m: ai.model, b: ai.baseUrl, t: temperature, x: maxTokens, msgs: messages,
   }));
   if (useCache) {
     const hit = cacheGet(cacheKey);
@@ -128,10 +131,10 @@ async function chat(messages, opts = {}) {
   let lastErr = null;
   for (let i = 0; i < attempts; i++) {
     try {
-      const { text, usage } = await chatOnce(messages, { temperature, maxTokens });
+      const { text, usage } = await chatOnce(messages, { temperature, maxTokens, ai });
       const durationMs = Date.now() - started;
       const normUsage = normalizeUsage(usage);
-      logAi(kind, config.ai.model, normUsage, durationMs, 'ok', null);
+      logAi(kind, ai.model, normUsage, durationMs, 'ok', null);
       const result = { text, usage: normUsage, durationMs, cached: false };
       if (useCache) cachePut(cacheKey, result);
       return result;
@@ -150,7 +153,7 @@ async function chat(messages, opts = {}) {
   const msg = isTimeout
     ? `模型请求超时（${config.ai.timeoutMs} 毫秒）。可以稍后重试，或在 .env 中调大 AI_TIMEOUT_MS。`
     : '模型服务调用失败：' + (lastErr ? lastErr.message : '未知错误');
-  logAi(kind, config.ai.model, null, durationMs, 'error', msg);
+  logAi(kind, ai.model, null, durationMs, 'error', msg);
   const err = isTimeout ? new AiTimeoutError(msg) : new AiResponseError(msg);
   throw err;
 }
