@@ -87,4 +87,17 @@ router.get('/history', (req, res) => {
   });
 });
 
+// 删除单条问答记录（同时会从仪表盘"最近学习记录"中消失）
+router.delete('/history/:id', (req, res) => {
+  const r = getDb().prepare('DELETE FROM qa_logs WHERE id = ?').run(req.params.id);
+  if (!r.changes) return res.status(404).json({ error: '记录不存在或已被删除。' });
+  res.json({ ok: true });
+});
+
+// 清空全部问答历史（不影响资料、题目与答题记录）
+router.delete('/history', (req, res) => {
+  const r = getDb().prepare('DELETE FROM qa_logs').run();
+  res.json({ ok: true, deleted: r.changes });
+});
+
 module.exports = router;

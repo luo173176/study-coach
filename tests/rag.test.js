@@ -96,6 +96,38 @@ test('模型自行承认证据不足时：标记 insufficient', async (t) => {
   assert.ok(body.answer.includes('现有资料不足'));
 });
 
+test('问答历史：可单条删除、可清空、缺失 id 返回 404', async (t) => {
+  const app = await freshApp(t);
+  const db = app.db();
+  const { id } = require('../server/util');
+  const mkQa = (q) => {
+    const qaId = id();
+    db.prepare('INSERT INTO qa_logs (id, question, answer, material_ids, insufficient, sources_json, created_at) VALUES (?,?,?,?,0,?,?)')
+      .run(qaId, q, '回答 ' + q, '[]', '[]', new Date().toISOString());
+    return qaId;
+  };
+  const a = mkQa('问题一');
+  const b = mkQa('问题二');
+
+  // 删除单条
+  const del1 = await fetch(app.base + '/api/chat/history/' + a, { method: 'DELETE' });
+  assert.strictEqual(del1.status, 200);
+  let hist = await (await fetch(app.base + '/api/chat/history')).json();
+  assert.strictEqual(hist.items.length, 1);
+  assert.strictEqual(hist.items[0].question, '问题二');
+
+  // 不存在的 id → 404
+  const missing = await fetch(app.base + '/api/chat/history/no-such-id', { method: 'DELETE' });
+  assert.strictEqual(missing.status, 404);
+
+  // 清空全部
+  const clear = await (await fetch(app.base + '/api/chat/history', { method: 'DELETE' })).json();
+  assert.strictEqual(clear.deleted, 1);
+  hist = await (await fetch(app.base + '/api/chat/history')).json();
+  assert.strictEqual(hist.items.length, 0);
+  assert.ok(!db.prepare('SELECT 1 FROM qa_logs WHERE id = ?').get(b));
+});
+
 test('选择指定资料提问：只在该资料范围内检索', async (t) => {
   const app = await freshApp(t);
   const m1 = await uploadSampleMaterial(app.base, '生物.txt');

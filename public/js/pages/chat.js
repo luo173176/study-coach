@@ -123,17 +123,50 @@ async function loadHistory(card = null) {
   try {
     const { items } = await api('/chat/history?limit=20');
     target.innerHTML = '';
-    target.append(el('h3', {}, `🕘 问答历史（${items.length}）`));
+
+    const headRow = el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:4px' }, [
+      el('h3', { style: 'margin:0' }, `🕘 问答历史（${items.length}）`),
+      items.length
+        ? el('button', {
+            class: 'btn btn-sm btn-danger',
+            onclick: async () => {
+              if (!confirm(`确定清空全部 ${items.length} 条问答历史？删除后不可恢复（不影响资料和题目）。`)) return;
+              try {
+                const r = await api('/chat/history', { method: 'DELETE' });
+                toast(`已清空 ${r.deleted} 条记录`, 'ok');
+                loadHistory(target);
+              } catch (e) { toast(e.message, 'err'); }
+            },
+          }, '清空历史')
+        : '',
+    ]);
+    target.append(headRow);
+
     if (!items.length) {
       target.append(emptyState('💬', '还没有提问记录。上方输入问题开始提问，回答会附带真实引用来源。'));
       return;
     }
     for (const item of items) {
       const d = el('details', { style: 'border-bottom:1px solid var(--border);padding:8px 0' });
-      d.append(el('summary', { style: 'cursor:pointer;font-weight:500' }, [
+      const delBtn = el('button', {
+        class: 'btn btn-sm btn-danger',
+        title: '删除这条记录',
+        onclick: async (e) => {
+          e.stopPropagation();
+          e.preventDefault(); // 阻止展开/收起
+          if (!confirm('删除这条问答记录？（不影响资料与题目）')) return;
+          try {
+            await api('/chat/history/' + item.id, { method: 'DELETE' });
+            toast('已删除', 'ok');
+            loadHistory(target);
+          } catch (err) { toast(err.message, 'err'); }
+        },
+      }, '删除');
+      d.append(el('summary', { style: 'cursor:pointer' }, [
         item.insufficient ? el('span', { class: 'badge badge-yellow' }, '证据不足') : el('span', { class: 'badge badge-green' }, '已回答'),
         ' ' + esc(item.question.length > 60 ? item.question.slice(0, 59) + '…' : item.question),
-        el('span', { class: 'muted', style: 'float:right' }, fmtTime(item.created_at)),
+        el('span', { class: 'muted', style: 'margin-left:8px' }, fmtTime(item.created_at)),
+        el('span', { style: 'float:right' }, delBtn),
       ]));
       d.append(renderQA(item));
       target.append(d);
